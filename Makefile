@@ -1,18 +1,19 @@
-# Makefile for Module 5-2 Notebook.ipynb
-# The upload system may append suffixes like "(4)" to filenames. This Makefile
-# does not rename files; it discovers the matching notebook at runtime.
+# Makefile for analyses/Module_5-2_Notebook.ipynb
+# Run this from the base repository folder.
 
 .ONESHELL:
 SHELL := /bin/sh
 
-NOTEBOOK_BASE := Module 5-2 Notebook
+NOTEBOOK := analyses/Module_5-2_Notebook.ipynb
+NOTEBOOK_DIR := analyses
 EXECUTED_NOTEBOOK := executed_Module_5-2_Notebook.ipynb
-PREPARED_NOTEBOOK := .prepared_Module_5-2_Notebook.ipynb
+DATA_DIR := data
+RESULTS_DIR := results
 
 PYTHON ?= python3
 VENV := .venv
 USE_VENV ?= 1
-PACKAGES := pandas matplotlib requests notebook nbconvert ipykernel
+PACKAGES := pandas matplotlib notebook nbconvert ipykernel
 
 .PHONY: all setup run clean veryclean
 
@@ -31,33 +32,30 @@ setup:
 
 run: setup
 	set -eu
-	notebook="$(NOTEBOOK_BASE).ipynb"
-	if [ ! -f "$$notebook" ]; then
-		notebook="$$(find . -maxdepth 1 -type f -name '$(NOTEBOOK_BASE)*.ipynb' | sort | head -n 1)"
-	fi
-	if [ -z "$$notebook" ] || [ ! -f "$$notebook" ]; then
-		echo "Could not find $(NOTEBOOK_BASE).ipynb or an uploaded variant like $(NOTEBOOK_BASE)(4).ipynb" >&2
+	if [ ! -f "$(NOTEBOOK)" ]; then
+		echo "Could not find $(NOTEBOOK). Make sure the notebook is named Module_5-2_Notebook.ipynb and is inside analyses/." >&2
 		exit 1
 	fi
-	echo "Using notebook: $$notebook"
-
-	# Prepare a temporary execution copy. The provided notebook uses pd.read_csv,
-	# so this adds the standard pandas alias only when that import is absent.
-	$(PYTHON) -c 'import json, sys; from pathlib import Path; source_path = Path(sys.argv[1]); out_path = Path(sys.argv[2]); nb = json.loads(source_path.read_text(encoding="utf-8")); code = "\n".join("".join(cell.get("source", [])) for cell in nb.get("cells", []) if cell.get("cell_type") == "code"); needs_pd = "pd." in code and "import pandas as pd" not in code and "from pandas" not in code; nb.setdefault("cells", []).insert(0, {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": ["import pandas as pd\n"]}) if needs_pd else None; out_path.write_text(json.dumps(nb, ensure_ascii=False, indent=1), encoding="utf-8")' "$$notebook" "$(PREPARED_NOTEBOOK)"
-
-	if [ "$(USE_VENV)" = "1" ]; then
-		jupyter="$(VENV)/bin/jupyter"
-	else
-		jupyter="jupyter"
+	if [ ! -d "$(DATA_DIR)" ]; then
+		echo "Could not find $(DATA_DIR)/. Add the required data files to the data folder before running the notebook." >&2
+		exit 1
 	fi
+	mkdir -p "$(RESULTS_DIR)"
+	repo_root="$$(pwd)"
+	if [ "$(USE_VENV)" = "1" ]; then
+		jupyter="$$repo_root/$(VENV)/bin/jupyter"
+	else
+		jupyter="$$(command -v jupyter)"
+	fi
+	cd "$(NOTEBOOK_DIR)"
 	"$$jupyter" nbconvert \
 		--to notebook \
-		--execute "$(PREPARED_NOTEBOOK)" \
+		--execute "Module_5-2_Notebook.ipynb" \
 		--output "$(EXECUTED_NOTEBOOK)"
 
 clean:
-	rm -rf data
-	rm -f "$(EXECUTED_NOTEBOOK)" "$(PREPARED_NOTEBOOK)"
+	rm -f "$(NOTEBOOK_DIR)/$(EXECUTED_NOTEBOOK)"
+	rm -rf "$(RESULTS_DIR)"
 
 veryclean: clean
 	rm -rf "$(VENV)"
